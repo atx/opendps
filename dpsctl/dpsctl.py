@@ -157,16 +157,17 @@ class tcp_interface(comm_interface):
 
     _socket = None
 
-    def __init__(self, if_name):
+    def __init__(self, if_name, port):
         super(tcp_interface, self).__init__(if_name)
 
         self._if_name = if_name
+        self._port = port
 
     def open(self):
         try:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._socket.settimeout(1.0)
-            self._socket.connect((self._if_name, 5005))
+            self._socket.connect((self._if_name, self._port))
         except socket.error:
             return False
         return True
@@ -206,10 +207,11 @@ class udp_interface(comm_interface):
 
     _socket = None
 
-    def __init__(self, if_name):
+    def __init__(self, if_name, port):
         super(udp_interface, self).__init__(if_name)
 
         self._if_name = if_name
+        self._port = port
 
     def open(self):
         try:
@@ -226,7 +228,7 @@ class udp_interface(comm_interface):
 
     def write(self, bytes_):
         try:
-            self._socket.sendto(bytes_, (self._if_name, 5005))
+            self._socket.sendto(bytes_, (self._if_name, self._port))
         except socket.error as msg:
             fail("{} ({:d})".format(str(msg[0]), msg[1]))
         return True
@@ -699,7 +701,7 @@ def create_comms(args):
 
     if if_name is not None:
         if is_ip_address(if_name):
-            comms = udp_interface(if_name)
+            comms = udp_interface(if_name, args.port)
         elif if_name[0:4] == "tcp:":
             comms = tcp_interface(if_name[4:])
         else:
@@ -740,11 +742,11 @@ def do_calibration(comms, args):
     print("\r\nPlease hook up the second higher supply voltage to the DPS now")
     print("ensuring that the serial connection is connected after boot")
     calibration_input_voltage.append(float(raw_input("Type input voltage in mV: ")))
-    
+
     # Ensure that we are still on the settings screen
     communicate(comms, create_change_screen(protocol.CHANGE_SCREEN_SETTINGS), args, quiet=True)
     time.sleep(1)
-    
+
     # Measure and record the new input voltage
     calibration_vin_adc.append(get_average_calibration_result(comms, 'vin_adc'))
 
@@ -1166,8 +1168,9 @@ def main():
     testing = '--testing' in sys.argv
     parser = argparse.ArgumentParser(description='Instrument an OpenDPS device')
 
-    parser.add_argument('-d', '--device', help="OpenDPS device to connect to. Can be a /dev/tty device, IP address for UDP protocol or tcp:IP for TCP protocol. If omitted, dpsctl.py will try the environment variable DPSIF", default='')
-    parser.add_argument('-b', '--baudrate', type=int, dest="baudrate", help="Set baudrate used for serial communications", default=9600)
+    parser.add_argument('-d', '--device', help="OpenDPS device to connect to. Can be a /dev/tty device or an IP number. If omitted, dpsctl.py will try the environment variable DPSIF", default='')
+    parser.add_argument('-b', '--baudrate', type=int, dest="baudrate", help="Set baudrate used for serial communications", default=115200)
+    parser.add_argument('--port', type=int, help="Set port used for connecting over UDP", default=5005)
     parser.add_argument('-B', '--brightness', type=int, help="Set display brightness (0..100)")
     parser.add_argument('-S', '--scan', action="store_true", help="Scan for OpenDPS wifi devices")
     parser.add_argument('-f', '--function', nargs='?', help="Set active function")
